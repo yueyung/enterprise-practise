@@ -1,0 +1,17 @@
+# /usr/local/bin/bind 实为shell脚本
+
+#!/bin/bash
+/usr/bin/docker run \
+  --restart=on-failure:5 \
+  --net=host \
+  -v /etc/bind:/data:rw \
+  --env="WEBMIN_INIT_REDIRECT_PORT=10000" \
+  --env="NS_DOMAIN=yyuap-dt-test.local" \
+  --env="WEBMIN_PASS=3+4NwLv-FeZ#" \
+  --env="BIND_MASTER_IP=10.3.100.174" \
+  --env="WEBMIN_URL=http://ns1.yyuap-dt-test.local:10000" \
+  --env="WEBMIN_API_PORT=8000" \
+  --env="EXTRA_ARGS=-n 0 -U 8" \
+  --name=bind \
+  --ulimit nofile=655360:655360 \
+  bind:9.18-webmin-2.102-20231214
