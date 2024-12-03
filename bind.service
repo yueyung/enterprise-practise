@@ -1,0 +1,17 @@
+[Unit]
+Description=bind docker wrapper
+Wants=docker.socket
+After=docker.service
+
+[Service]
+User=root
+PermissionsStartOnly=true
+ExecStart=/usr/local/bin/bind
+ExecStartPre=-/usr/bin/docker rm -f bind
+ExecStop=/usr/bin/docker stop bind
+Restart=always
+RestartSec=15s
+TimeoutStartSec=30s
+
+[Install]
+WantedBy=multi-user.target
