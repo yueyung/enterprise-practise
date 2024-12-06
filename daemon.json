@@ -1,0 +1,9 @@
+{
+    "registry-mirrors": ["https://docker.m.daocloud.io", "https://docker.1panel.live", "https://docker.lixd.xyz"],
+    "insecure-registries": ["10.3.100.50:81"],
+    "exec-opts": ["native.cgroupdriver=systemd"],
+    "log-driver": "json-file",
+    "log-opts": {
+        "max-size": "100m"
+    }
+}
