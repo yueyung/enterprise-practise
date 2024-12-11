@@ -1,0 +1,73 @@
+
+srvctl config database -d <db_unique_name> 获取数据库名称、实例名称
+olsnodes|srvctl status database -d <db_unique_name> 获取节点名称、实例名称
+
+一、实例重启
+1. 检查监听状态
+lsnrctl status
+ps -ef| grep lsnr
+
+2. RAC停止监听
+srvctl stop listener
+srvctl stop scan_listener
+
+3. 检查job与session （视情况执行）
+ps -ef|grep LOCAL=NO|grep -v grep|cut -c 9-15|xargs kill -9
+ps -ef|grep ora_j|grep -v grep|awk '{print $2}'|xargs kill -9
+
+4. 停启数据库某个实例
+srvctl stop instance -d racdb -i racdb1
+srvctl start instance -d racdb -i racdb1
+
+5. 检查
+/home/app/grid/11.2.0/bin/crsctl status res -t
+ps -ef| grep lsnr
+lsnrctl status
+srvctl status instance -d racdb -i racdb1,racdb2 -v
+
+二、rac启停集群
+停止集群需要在停止数据库实例之后，否则实例是以shutdown abort的方式停止
+1. 检查集群的状态
+crsctl check crs
+CRS-4638: Oracle High Availability Services is online
+CRS-4537: Cluster Ready Services is online
+CRS-4529: Cluster Synchronization Services is online
+CRS-4533: Event Manager is online
+这个命令是用于检查集群的四大服务，has,crs,css与evm
+crsctl status res -t
+主要用于检查集群各个资源的状态
+（ora.gsd offline ora.asm Started其他都是ONLINE）
+
+2. 停止集群
+crsctl stop crs -f
+在停止过程中建议另外开启一个窗口关注alert日志，减少停止集群时挂起分析的时间。
+tailf /home/app/oracle/diag/rdbms/racdb/racdb1/trace/alert_racdb1.log
+tailf /home/app/oracle/diag/rdbms/racdb/racdb2/trace/alert_racdb2.log
+
+
+3.禁用自动启动集群
+通常在停机维修中需要使用到，当主机启动的时候，会自动将集群进行拉起，如果维修主机需要启动操作系统多次的情况，需要将自动启动CRS服务禁用。
+crsctl disable crs
+
+... reboot ...
+
+4. 启动集群
+crsctl start crs
+启动集群的时候建议另外开启一个窗口观察alert日志，检查集群启动的阶段。
+crsctl stat res -t -init
+这个命令可以看到集群启动到哪个阶段。
+
+5. 检查集群的状态
+crsctl check crs
+
+6. 启用自动集群
+crsctl enable crs
+
+
+三、OA库重启实践
+逐个对两个节点作如下操作
+crsctl stop crs
+reboot
+ps -ef| grep pmon
+crsctl check crs
+crsctl stat res -t
