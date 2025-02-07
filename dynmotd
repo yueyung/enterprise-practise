@@ -1,0 +1,192 @@
+#!/usr/bin/env bash
+
+# author: sean(lvsg@yonyou.com)
+# date: 2023-08-01
+# function: show dynamic information after login server
+
+# Change TERM value that is 'xterm' because it leads to extra '(B' chars after sgr0
+TERM=ansi
+# ---- Set Colors
+bold=$(tput bold) # 加粗字体
+# half_bright=$(tput dim) # turn on half-bright mode
+blink=$(tput blink)  # Set blink mode
+# underline=$(tput smul) # Set underline mode
+# exit_underline=$(tput rmul) # Exit underline mode
+# reverse=$(tput rev) # Turn on reverse mode，突出模式，所有输出字符都突出显示。
+# exit_reverse=$(tput rmso) # Exit standout mode，退出突出显示。
+reset_attr=$(tput sgr0) # Turn off all attributes，取消所有属性。
+
+# tput setab [0-7] – 设置背景色。
+# tput setaf [0-7] – 设置前景色。
+# black=$(tput setaf 0)
+red=$(tput setaf 1)
+green=$(tput setaf 2)
+yellow=$(tput setaf 3)
+blue=$(tput setaf 4)
+magenta=$(tput setaf 5) #洋红
+cyan=$(tput setaf 6) #青色
+white=$(tput setaf 7)
+reset_color=$(tput setaf 9) # Reset to default color = 9
+# ---- get infos
+OS=$(uname -o)
+USER=`whoami`
+FROM=`who am i | grep -Po "(?<=\().*(?=\))"`
+HOSTNAME_FQDN=`hostname`
+HOSTNAME=`hostname -s`
+SELinux=$(/usr/sbin/sestatus 2>/dev/null | grep "SELinux status: " | awk '{print $3}')
+LastReboot=$(who -b | awk '{print $3,$4}')
+# IP=`ip addr | awk '/inet/ && ! /\/32/ {ip[$NF] = $2; sub(/\/.*$/,"",ip[$NF])} END {for(i in ip){if(i ~ "en|eth0") print ip[i]}}'`
+IP=$(hostname -I|awk '{print $1}')
+
+if [ -f /etc/redhat-release ]; then
+    RELEASE=`cat /etc/redhat-release`
+elif [ -f /etc/os-release ]; then
+    RELEASE=$(cat /etc/os-release | sed -n 's/^NAME=\(.*\)/\1/p;s/^VERSION=\(.*\)/" "\1/p' | awk '{gsub(/"|,|^\s+|/, "");print}' | sed ":a;N;s/\n//g;ta")
+fi
+
+KERNEL_VERSION=`uname -r`
+CPU_Type=$(grep "model name" /proc/cpuinfo | awk -F ': ' '{print $2}' | sort | uniq)
+CPU_Arch=$(uname -m)
+
+PSA=`ps -Afl | wc -l`
+FORMATEDTIME=`date +"%Y-%m-%d %T"`
+# Time of day
+HOUR=$(date +"%H")
+if [ $HOUR -lt 12  -a $HOUR -ge 0 ]; then
+    TIME="上午好"
+elif [ $HOUR -lt 17 -a $HOUR -ge 12 ]; then
+    TIME="下午好"
+else
+    TIME="晚上好"
+fi
+
+#### System uptime ####
+uptime=`cat /proc/uptime | cut -f1 -d.`
+upDays=$((uptime/60/60/24))
+upHours=$((uptime/60/60%24))
+upMins=$((uptime/60%60))
+upSecs=$((uptime%60))
+SYS_UPTIME="$upDays days $upHours hours $upMins minutes $upSecs seconds $RESET_COLORS"
+#### 网络检查 ####
+DNS=$(grep nameserver /etc/resolv.conf| grep -v "#" | awk '{print $2}' | tr '\n' '|' | sed 's/|$//')
+
+#### 进程检查 ####
+# 僵尸进程
+defunct=$(ps -A -o stat,ppid,pid,cmd | grep -e '^[Zz]' | wc -l)
+
+########## 资源统计 ########
+# 列表显示系统资源使用情况
+#memory
+MEMORY=`free -m|awk 'NR==2 {printf("内存 %.2f%% %sM %sM\n",100-($7*100/$2),$2,$3,$7)}'`
+
+#disk
+DISK_DATA=`df -Ph | egrep '/$|/data$' |awk '{printf "区[%s] %s %s %s\n", $6,$5,$3,$4}'`
+
+#load负载情况
+up_time=`uptime`
+cpu_nums=`grep -c 'processor' /proc/cpuinfo`
+load_1min=`echo $up_time | awk '{print $(NF-2)}'|sed 's/,//g'`
+load_5min=`echo $up_time | awk '{print $(NF-1)}'|sed 's/,//g'`
+load_15min=`echo $up_time | awk '{print $NF}'|sed 's/,//g'`
+use_percent1=$(echo "$load_1min $cpu_nums" | awk '{printf ("%.1f\n",$1*100/$2)}')
+use_percent5=$(echo "$load_5min $cpu_nums" | awk '{printf ("%.1f\n",$1*100/$2)}')
+use_percent15=$(echo "$load_15min $cpu_nums" | awk '{printf ("%.1f\n",$1*100/$2)}')
+use_percent1=$([ `echo $use_percent1|awk '{print int($0)}'` -lt 100 ] && echo -n "$use_percent1" || echo -n 100)
+use_percent5=$([ `echo $use_percent5|awk '{print int($0)}'` -lt 100 ] && echo -n "$use_percent5" || echo -n 100)
+use_percent15=$([ `echo $use_percent15|awk '{print int($0)}'` -lt 100 ] && echo -n "$use_percent15" || echo -n 100)
+LOAD="负载1/5/15分钟 $use_percent1/$use_percent5/$use_percent15 - -"
+
+disk_use_warning=`df -Ph | egrep -v '/$|/data$' | sed '1d;/ /!N;s/\n//;s/ \+/ /;' | awk 'sub (/%/, "", $5){if ($5*1 > 89) printf "区[%s] %s %s %s\n", substr($6,1,10),$5,$3,$4}'`
+cpu_use_warning=$(top b -n1 |awk '/^ \s+PID/,/NF/'|head -n20 | awk 'NR>1{if ($9*1 > 30) printf "CPU高@'${cyan}'CPU:'${blink}${red}'%s'${reset_attr}${cyan}'% '${cyan}'MEM:'${green}'%s% '${cyan}'PID:'${green}'%s '${cyan}'命令:'${green}'%s\n", $9,$10,$1,substr($NF,1,20)}')
+mem_use_warning=$(ps aux | awk '{print $2, $3, $4, $6, $11}' | sort -k4rn | head -n 20| awk '{if ($3*1 > 20) printf "内存高@'${cyan}'CPU:'${green}'%s'${cyan}'% '${cyan}'MEM:'${blink}${red}'%s'${reset_attr}${cyan}'% '${cyan}'PID:'${green}'%s '${cyan}'命令:'${green}'%s\n", $2,$3,$1,substr($5,1,20)}')
+######## 汇总显示项 ########
+#system base info
+SYS_INFO="主机名@${HOSTNAME_FQDN}\nIP地址@${IP}\n系统@${OS}\n发行版本@${RELEASE}\n内核@${KERNEL_VERSION}\n核心@${cpu_nums}\nCPU型号@${CPU_Type}\nCPU架构@${CPU_Arch}\n当前时间@${FORMATEDTIME}\n最后启动@${LastReboot}\n运行时间@${SYS_UPTIME}\nDNS@${DNS}\n进程数@${PSA}"
+## extra system base info
+if [ "$SELinux" != "" -a "$SELinux" != "disabled" ]; then
+    SYS_INFO="${SYS_INFO}\nSELinux@${SELinux}"
+fi
+if [ $defunct -gt 0 ]; then
+    SYS_INFO="${SYS_INFO}\n僵尸进程@${defunct}"
+fi
+if [ "X$cpu_use_warning" != "X" ]; then
+    SYS_INFO="${SYS_INFO}\n${cpu_use_warning}"
+fi
+if [ "X$mem_use_warning" != "X" ]; then
+    SYS_INFO="${SYS_INFO}\n${mem_use_warning}"
+fi
+#usage info
+USAGE_INFO="${LOAD}\n${MEMORY}\n${DISK_DATA}"
+## extra usage info
+if [ "X$disk_use_warning" != "X" ]; then
+    USAGE_INFO="${USAGE_INFO}\n${disk_use_warning}"
+fi
+
+#################### 显示 ########################
+printf "${bold}${cyan}*******************************************\n"
+printf "${bold}${cyan}$TIME ${yellow}$USER${cyan}!${blink}${red} ❤ ${reset_attr}[ ${blue}${bold}技 术 中 台 诊 断 信 息 ${white} ]\n"
+printf "${bold}${cyan}*******************************************\n"
+
+# 显示hostname
+WIDTH=$(tput cols)
+printf "${bold}${magenta}"
+if hash figlet 2>/dev/null; then
+    if [ ! -z "$WIDTH" ];then
+        figlet $HOSTNAME -k -w $WIDTH 2>/dev/null
+    else
+        figlet $HOSTNAME 2>/dev/null
+    fi
+fi
+printf "${reset_attr}"
+
+#----------显示监控信息------------------
+echo -e "$SYS_INFO" | awk -F'@' -f /usr/local/bin/color.awk -e '
+BEGIN{
+    title = BG_CYAN("项目            系统信息                                         ");
+    print title;
+}
+{
+    if($1=="主机名"){
+        $2 = BRIGHT_MAGENTA($2)
+    } else if($1=="IP地址"){
+        $2 = BG_BRIGHT_MAGENTA($2)
+    } else if($1=="僵尸进程" || $1=="SELinux"){
+        $2 = BL_BRIGHT_YELLOW($2)
+    } else{
+        $2 = GREEN($2);
+    }
+    $1 = BRIGHT_CYAN($1);
+    printf "%-20s\t%-40s\t\n", $1,$2;
+}'
+
+
+echo -e "$USAGE_INFO" | awk -f /usr/local/bin/color.awk -e '
+BEGIN{
+    line = CYAN("-----------------------------------------------------------------");
+    title = BG_CYAN("项目            使用率          已用    空闲          图示       ");
+    print;
+    print title;
+    print line;
+}
+{
+    sub (/%/, "", $2);
+    $5 = percent_bar($2)
+    if($2*1 > 80 && $2*1 <= 89){     
+        $1 = BRIGHT_YELLOW($1)
+        $2 = BL_BRIGHT_YELLOW($2)BRIGHT_CYAN("%")
+        $3 = BRIGHT_YELLOW($3);
+        $4 = BRIGHT_YELLOW($4);
+    } else if($2*1 > 89){
+        $1 = BRIGHT_RED($1)
+        $2 = BL_BRIGHT_RED($2)BRIGHT_CYAN("%")
+        $3 = BRIGHT_RED($3);
+        $4 = BRIGHT_RED($4);
+    } else{
+        $1 = BRIGHT_CYAN($1)
+        $2 = BRIGHT_GREEN($2)BRIGHT_CYAN("%")
+        $3 = BRIGHT_CYAN($3);
+        $4 = GREEN($4);
+    }
+    printf "%-20s\t%-30s\t%-5s\t%-5s\t%-17s\t\n", $1,$2,$3,$4,$5;
+    print line
+}'
