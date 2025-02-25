@@ -13,7 +13,8 @@ wget -O "${2:-${1##*/}}" https://mirrors.chenby.cn/$1
 EOF
 
 cat >> /usr/local/bin/daodl <<\EOF
-# wget https://files.m.daocloud.io/get.helm.sh/helm-v3.8.2-linux-amd64.tar.gz
+# 原下载链接 wget https://get.helm.sh/helm-v3.9.1-linux-amd64.tar.gz
+# 加速下载链接 wget https://files.m.daocloud.io/get.helm.sh/helm-v3.8.2-linux-amd64.tar.gz
 wget -O "${2:-${1##*/}}" https://files.m.daocloud.io/${1#https://}
 EOF
 
