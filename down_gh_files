@@ -1,4 +1,4 @@
-# 下载 github 文件多种方式，主推前两种
+# 下载 github 文件多种方式，主推前三种
 
 cat >> /usr/loca/bin/npeedl <<\EOF
 wget -O "${2:-${1##*/}}" https://down.npee.cn?$1
@@ -12,8 +12,13 @@ cat >> /usr/loca/bin/chenbydl <<\EOF
 wget -O "${2:-${1##*/}}" https://mirrors.chenby.cn/$1
 EOF
 
+cat >> /usr/local/bin/daodl <<\EOF
+# wget https://files.m.daocloud.io/get.helm.sh/helm-v3.8.2-linux-amd64.tar.gz
+wget -O "${2:-${1##*/}}" https://files.m.daocloud.io/${1#https://}
+EOF
+
 chmod u+x,g+x /usr/local/bin/{npeedl,ghpxydl,chenbydl}
 
 # 使用示例
-npeedl|ghpxydl|chenbydl <github-file-url> [saved-file-name]
+npeedl|ghpxydl|daodl|chenbydl <github-file-url> [saved-file-name]
 
