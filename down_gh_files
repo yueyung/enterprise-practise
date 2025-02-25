@@ -1,0 +1,19 @@
+# 下载 github 文件多种方式，主推前两种
+
+cat >> /usr/loca/bin/npeedl <<\EOF
+wget -O "${2:-${1##*/}}" https://down.npee.cn?$1
+EOF
+
+cat >> /usr/loca/bin/ghpxydl <<\EOF
+wget -O "${2:-${1##*/}}" https://ghfast.top/$1
+EOF
+
+cat >> /usr/loca/bin/chenbydl <<\EOF
+wget -O "${2:-${1##*/}}" https://mirrors.chenby.cn/$1
+EOF
+
+chmod u+x,g+x /usr/local/bin/{npeedl,ghpxydl,chenbydl}
+
+# 使用示例
+npeedl|ghpxydl|chenbydl <github-file-url> [saved-file-name]
+
