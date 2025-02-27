@@ -18,7 +18,7 @@ cat >> /usr/local/bin/daodl <<\EOF
 wget -O "${2:-${1##*/}}" https://files.m.daocloud.io/${1#https://}
 EOF
 
-chmod u+x,g+x /usr/local/bin/{npeedl,ghpxydl,chenbydl}
+chmod u+x,g+x /usr/local/bin/{npeedl,ghpxydl,daodl,chenbydl}
 
 # 使用示例
 npeedl|ghpxydl|daodl|chenbydl <github-file-url> [saved-file-name]
